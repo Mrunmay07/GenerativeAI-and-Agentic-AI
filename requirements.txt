@@ -1,0 +1,8 @@
+langchain
+langchain-google-genai
+langchain-groq
+dotenv
+streamlit
+langchain-ollama
+langchain-community
+langgraph   
