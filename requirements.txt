@@ -9,3 +9,4 @@ langgraph
 pypdf
 langchain-docling
 beautifulsoup4
+langchain-text-splitters  
