@@ -1,6 +1,7 @@
 langchain
 langchain-google-genai
 langchain-groq
+langchain-huggingface
 dotenv
 streamlit
 langchain-ollama
@@ -9,4 +10,6 @@ langgraph
 pypdf
 langchain-docling
 beautifulsoup4
-langchain-text-splitters  
+langchain-text-splitters
+sentence-transformers  
+langchain-chroma
