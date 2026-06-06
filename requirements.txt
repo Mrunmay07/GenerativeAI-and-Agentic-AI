@@ -13,3 +13,4 @@ beautifulsoup4
 langchain-text-splitters
 sentence-transformers  
 langchain-chroma
+pydantic
