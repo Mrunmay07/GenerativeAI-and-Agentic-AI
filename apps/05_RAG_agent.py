@@ -1,7 +1,9 @@
+
 from dotenv import load_dotenv
 load_dotenv()
 
-from langchain_community.document_loaders import PyPDFLoader , PyPDFDirectoryLoader
+
+from langchain_community.document_loaders import PyPDFLoader, PyPDFDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
@@ -11,7 +13,9 @@ from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 import streamlit as st
 
-# Session State
+
+### data in st session
+
 if "document_uploaded" not in st.session_state:
     st.session_state.document_uploaded = False
 
@@ -23,54 +27,47 @@ if "vector_store" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+    
 
 
 def process_document(path):
-    # Load document
+
+    ## load the documents
     loader = PyPDFDirectoryLoader(path)
     docs = loader.load()
 
-    # Split document
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
-    )
-    splitted_docs = splitter.split_documents(docs)
 
-    # Embeddings & Vector Store
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-mpnet-base-v2"
-    )
+    ## split into chunks
+    splitter = RecursiveCharacterTextSplitter(chunk_size = 1000, chunk_overlap = 200)
+    docs = splitter.split_documents(documents=docs)
 
+
+    ## embeddings and Vector DB
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
     vector_db = InMemoryVectorStore.from_documents(
-        documents=splitted_docs,
+        documents=docs,
         embedding=embeddings
     )
 
-    # LLM
+
+    ## create a agent - tool, llm, prompt
     llm = ChatGroq(model="openai/gpt-oss-20b")
 
     @tool
-    def retrieve_context(query: str):
+    def retrieve_context(query:str):
         """Retrieve documents relevant to a query from the knowledge base."""
-
         context = ""
-
-        docs = vector_db.similarity_search(
-            query=query,
-            k=4
-        )
-
+        docs = vector_db.similarity_search(query=query, k=3)
         for doc in docs:
-            context += doc.page_content + "\n\n"
+            context = doc.page_content + "\n\n"
 
         return context
 
-    system_prompt = """
-    You are a helpful assistant that answers questions using retrieved context.
-    My knowledge base consists of the details from the uploaded document.
-    ALWAYS use the retrieve_context tool for questions requiring external knowledge.
-    """
+
+    system_prompt = """You are a helpful assistant that answers questions using retrieved context. 
+        My knowledge base consists of the details from the uploaded document. 
+        ALWAYS use the `retrieve_context` tool for questions requiring external knowledge."""
+
 
     memory = InMemorySaver()
 
@@ -80,31 +77,53 @@ def process_document(path):
         system_prompt=system_prompt,
         checkpointer=memory
     )
-    
+
     st.session_state.agent = agent
     st.session_state.document_uploaded = True
 
-    return agent, vector_db
 
 
-# Upload UI
+### upload ui
 if not st.session_state.document_uploaded:
-    uploaded = st.file_uploader(
-        label="Select PDF Files",
-        type=["pdf"],
-        accept_multiple_files=True
-    )
-
+    uploaded = st.file_uploader(label="Select PDF Files", type=["pdf"], accept_multiple_files=True)
     if uploaded:
         with st.spinner("Processing..."):
             path = "./doc_files/"
-
             for file in uploaded:
                 with open(path + file.name, "wb") as f:
                     f.write(file.getvalue())
+
             process_document(path)
             st.rerun()
 
-# Chat UI
+            
+## chat ui
+
 if st.session_state.document_uploaded and st.session_state.agent:
-    query = st.chat_input("Ask anything related to uploaded documents...")
+    for message in st.session_state.messages:
+        role = message.get("role")
+        content = message.get("content")
+        st.chat_message(role).markdown(content)
+
+
+    query = st.chat_input("Ask anything related to uploaded documents....")
+    if query:
+        st.session_state.messages.append({"role":"user", "content":query})
+
+        st.chat_message("user").markdown(query)
+        response = st.session_state.agent.invoke(
+            {"messages":[{"role":"user", "content":query}]},
+            {"configurable":{"thread_id":1}}
+        )
+
+        answer = response["messages"][-1].content
+        st.chat_message("ai").markdown(answer)
+        st.session_state.messages.append({"role":"ai", "content":answer})
+
+
+
+
+
+
+
+
